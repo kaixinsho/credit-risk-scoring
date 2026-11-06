@@ -24,7 +24,7 @@ def add_features(df):
 def prepare_X(df, categories=None):
     X = df.drop(columns=["TARGET", "SK_ID_CURR"], errors="ignore")
     if categories is None:
-        cat_cols = X.select_dtypes("object").columns
+        cat_cols = X.select_dtypes(exclude="number").columns
         categories = {c: sorted(X[c].dropna().unique()) for c in cat_cols}
     for col, cats in categories.items():
         X[col] = pd.Categorical(X[col], categories=cats)
