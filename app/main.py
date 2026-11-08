@@ -1,3 +1,13 @@
+import ctypes
+import sys
+from pathlib import Path
+
+# Server Vercel tidak punya libgomp (dibutuhkan LightGBM), jadi kita muat salinan sendiri dulu
+if sys.platform.startswith("linux"):
+    _gomp = Path(__file__).resolve().parent.parent / "lib" / "libgomp.so.1"
+    if _gomp.exists():
+        ctypes.CDLL(str(_gomp), mode=ctypes.RTLD_GLOBAL)
+
 from pathlib import Path
 
 import joblib

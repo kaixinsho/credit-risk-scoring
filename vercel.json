@@ -1,7 +1,7 @@
 {
   "functions": {
     "app/main.py": {
-      "includeFiles": "models/**",
+      "includeFiles": "{models,lib}/**",
       "excludeFiles": "notebooks/**"
     }
   }
