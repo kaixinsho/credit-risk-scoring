@@ -1,0 +1,822 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Penilaian risiko kredit</title>
+<meta name="description" content="Simulasi penilaian risiko kredit: isi data seorang pemohon pinjaman dan lihat perkiraan peluang gagal bayarnya.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231b4db1'/%3E%3Ccircle cx='11' cy='11' r='3' fill='white'/%3E%3Ccircle cx='21' cy='11' r='3' fill='white' fill-opacity='.45'/%3E%3Ccircle cx='11' cy='21' r='3' fill='white' fill-opacity='.45'/%3E%3Ccircle cx='21' cy='21' r='3' fill='white' fill-opacity='.45'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #f4f6f9;
+  --surface: #ffffff;
+  --ink: #0f1b2d;
+  --muted: #55627a;
+  --rule: #d8dee8;
+  --rule-strong: #b3bed0;
+  --accent: #1b4db1;
+  --accent-hover: #153d93;
+  --low: #1d7a55;
+  --mid: #9a5a0a;
+  --high: #b02a40;
+  --dot-off: #dce2ec;
+  --radius: 8px;
+  --sans: "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color-scheme: light;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+a { color: inherit; text-decoration-color: var(--rule-strong); text-underline-offset: 3px; }
+a:hover { text-decoration-color: currentColor; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.wrap { width: 100%; max-width: 1160px; margin: 0 auto; padding: 0 24px; }
+
+.skip {
+  position: absolute; left: -9999px; top: 8px;
+  background: var(--ink); color: #fff; padding: 8px 12px; border-radius: 6px; z-index: 10;
+}
+.skip:focus { left: 8px; }
+
+/* Header */
+.site-header { border-bottom: 1px solid var(--rule); background: var(--surface); }
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 64px; flex-wrap: wrap; padding-top: 8px; padding-bottom: 8px; }
+.brand { font-weight: 700; font-size: 1.0625rem; letter-spacing: -0.01em; text-decoration: none; }
+.links { display: flex; gap: 24px; font-size: 0.9375rem; color: var(--muted); }
+.links a { text-decoration: none; }
+.links a:hover { color: var(--ink); text-decoration: underline; }
+
+/* Intro */
+.intro { padding-top: 56px; padding-bottom: 36px; }
+.intro h1 {
+  margin: 0 0 16px;
+  max-width: 20ch;
+  font-size: clamp(2.125rem, 4.6vw, 3.25rem);
+  line-height: 1.08;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+.lede { margin: 0; max-width: 62ch; font-size: 1.125rem; line-height: 1.6; color: var(--muted); }
+
+/* Workspace */
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 40px;
+  align-items: start;
+  padding-bottom: 24px;
+}
+
+.panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; }
+
+.form-panel { padding: 28px 32px 32px; }
+
+.examples { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin: 0 0 8px; }
+.examples span { font-size: 0.9375rem; color: var(--muted); margin-right: 2px; }
+
+.units { margin: 0 0 8px; font-size: 0.875rem; color: var(--muted); max-width: 64ch; }
+
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+fieldset + fieldset { margin-top: 8px; }
+
+legend {
+  display: block; width: 100%;
+  padding: 24px 0 12px;
+  margin: 0 0 16px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 1.0625rem; font-weight: 600; letter-spacing: -0.01em;
+}
+
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px; }
+.field { min-width: 0; }
+.field.wide { grid-column: 1 / -1; }
+
+label, .label { display: block; margin: 0 0 6px; font-size: 0.9375rem; font-weight: 500; }
+
+input[type="text"], input[type="number"], select {
+  width: 100%;
+  height: 46px;
+  padding: 0 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  border: 1px solid var(--rule-strong);
+  border-radius: 6px;
+}
+input::placeholder { color: #8591a6; }
+input:disabled { background: var(--paper); color: var(--muted); cursor: not-allowed; }
+
+select {
+  appearance: none;
+  padding-right: 38px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%2355627a' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+}
+
+input:hover, select:hover { border-color: #8b99b1; }
+input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; border-color: var(--accent); }
+
+.field.invalid input, .field.invalid select { border-color: var(--high); }
+
+.hint { margin: 6px 0 0; font-size: 0.8125rem; line-height: 1.45; color: var(--muted); }
+.err { margin: 6px 0 0; font-size: 0.8125rem; line-height: 1.4; color: var(--high); font-weight: 500; }
+.err:empty { display: none; }
+
+.check { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 0.9375rem; font-weight: 400; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+
+.actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--rule); }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 48px; padding: 0 22px;
+  font: inherit; font-weight: 600; font-size: 1rem;
+  border-radius: 6px; border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.btn-primary { background: var(--accent); color: #fff; min-width: 180px; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-primary:disabled { background: #7f95c4; cursor: progress; }
+.btn-secondary { background: transparent; color: var(--ink); border-color: var(--rule-strong); }
+.btn-secondary:hover { border-color: var(--ink); }
+.btn-quiet {
+  min-height: 36px; padding: 0 14px; font-size: 0.9375rem; font-weight: 500;
+  background: var(--paper); color: var(--ink); border-color: var(--rule);
+}
+.btn-quiet:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Result */
+.result-panel { position: sticky; top: 24px; padding: 28px 32px 32px; --level: var(--muted); }
+.result-panel[data-level="low"] { --level: var(--low); }
+.result-panel[data-level="mid"] { --level: var(--mid); }
+.result-panel[data-level="high"] { --level: var(--high); }
+
+.result-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+.result-head h2 { margin: 0; font-size: 1.0625rem; font-weight: 600; letter-spacing: -0.01em; }
+
+.verdict { display: none; align-items: center; gap: 8px; font-size: 0.9375rem; font-weight: 600; color: var(--level); }
+.verdict::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+
+.figure { display: flex; align-items: baseline; gap: 4px; line-height: 1; }
+.figure .num {
+  font-size: clamp(3.5rem, 7vw, 4.75rem);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.figure .unit { font-size: clamp(1.75rem, 3.4vw, 2.25rem); font-weight: 500; color: var(--muted); }
+.result-panel:not([data-state="done"]) .figure .num { color: var(--rule-strong); font-weight: 500; }
+.figure-label { margin: 10px 0 24px; font-size: 0.9375rem; color: var(--muted); }
+
+.dots { display: grid; grid-template-columns: repeat(10, 1fr); gap: 9px; max-width: 340px; }
+.dots i {
+  display: block; aspect-ratio: 1; border-radius: 50%;
+  background: var(--dot-off);
+  transition: background-color 0.28s ease;
+  transition-delay: calc(var(--i) * 7ms);
+}
+.dots i.on { background: var(--level); }
+
+.caption { margin: 18px 0 0; font-size: 1rem; line-height: 1.5; max-width: 46ch; }
+.caption.is-error { color: var(--high); font-weight: 500; }
+
+.only-done { display: none; }
+.result-panel[data-state="done"] .only-done { display: block; }
+.result-panel[data-state="done"] .verdict { display: inline-flex; }
+
+.compare { margin: 20px 0 0; padding-top: 20px; border-top: 1px solid var(--rule); font-size: 0.9375rem; color: var(--muted); max-width: 52ch; }
+
+.summary { margin: 20px 0 0; padding: 0; }
+.summary div { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-top: 1px solid var(--rule); font-size: 0.9375rem; }
+.summary div:last-child { border-bottom: 1px solid var(--rule); }
+.summary dt { color: var(--muted); }
+.summary dd { margin: 0; font-weight: 500; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.fine { margin: 16px 0 0; font-size: 0.8125rem; line-height: 1.5; color: var(--muted); }
+
+/* Notes */
+.notes { margin-top: 56px; padding-top: 8px; padding-bottom: 72px; }
+.notes-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px; border-top: 1px solid var(--rule-strong); padding-top: 28px; }
+.notes h2 { margin: 0 0 12px; font-size: 1.125rem; font-weight: 600; letter-spacing: -0.01em; }
+.notes p { margin: 0 0 12px; max-width: 58ch; color: var(--muted); font-size: 0.9375rem; line-height: 1.6; }
+.notes ul { margin: 0 0 12px; padding-left: 20px; color: var(--muted); font-size: 0.9375rem; line-height: 1.6; }
+.notes li { margin-bottom: 4px; }
+
+.site-footer { border-top: 1px solid var(--rule); background: var(--surface); }
+.foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 24px; padding-top: 24px; padding-bottom: 28px; font-size: 0.875rem; color: var(--muted); }
+.foot p { margin: 0; }
+
+noscript p { max-width: 62ch; margin: 0 0 24px; padding: 12px 16px; border: 1px solid var(--high); border-radius: 6px; color: var(--high); background: var(--surface); }
+
+@media (max-width: 960px) {
+  .workspace { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+  .result-panel { position: static; }
+  .notes-grid { grid-template-columns: minmax(0, 1fr); gap: 36px; }
+}
+
+@media (max-width: 600px) {
+  .wrap { padding: 0 16px; }
+  .intro { padding-top: 36px; padding-bottom: 24px; }
+  .lede { font-size: 1.0625rem; }
+  .form-panel, .result-panel { padding: 20px 18px 24px; }
+  .fields { grid-template-columns: minmax(0, 1fr); }
+  .btn-primary, .btn-secondary { width: 100%; }
+  .dots { gap: 7px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dots i, .btn { transition: none; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#form">Langsung ke formulir</a>
+
+<header class="site-header">
+  <div class="wrap bar">
+    <a class="brand" href="/">Penilaian risiko kredit</a>
+    <nav class="links" aria-label="Tautan proyek">
+      <a href="/docs">Dokumentasi API</a>
+      <a href="https://github.com/kaixinsho/credit-risk-scoring" target="_blank" rel="noopener">Kode di GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="wrap intro">
+    <h1>Berapa peluang pemohon gagal bayar?</h1>
+    <p class="lede">Isi data seorang pemohon pinjaman. Model memperkirakan peluang pinjaman itu tidak dilunasi, berdasarkan pola dari ratusan ribu permohonan sebelumnya. Alat seperti ini membantu analis kredit di bank dan lembaga pembiayaan memilah permohonan yang perlu ditinjau lebih teliti.</p>
+  </section>
+
+  <div class="wrap">
+    <noscript><p>Halaman ini membutuhkan JavaScript untuk menghitung hasil. Aktifkan JavaScript di browser Anda, lalu muat ulang halaman.</p></noscript>
+  </div>
+
+  <div class="wrap workspace">
+    <section class="panel form-panel" aria-labelledby="form-title">
+      <h2 id="form-title" class="label" style="position:absolute;left:-9999px">Data pemohon</h2>
+
+      <div class="examples">
+        <span>Isi dengan contoh:</span>
+        <button type="button" class="btn btn-quiet" data-preset="a">Pemohon muda, pinjaman besar</button>
+        <button type="button" class="btn btn-quiet" data-preset="b">Pemohon mapan, pinjaman kecil</button>
+      </div>
+      <p class="units">Nominal memakai satuan dari data asli, bukan Rupiah. Gunakan contoh di atas sebagai acuan skala angka.</p>
+
+      <form id="form" novalidate>
+        <fieldset>
+          <legend>Pinjaman yang diajukan</legend>
+          <div class="fields">
+            <div class="field wide">
+              <label for="contract_type">Jenis pinjaman</label>
+              <select id="contract_type">
+                <option value="Cash loans">Pinjaman tunai</option>
+                <option value="Revolving loans">Pinjaman bergulir (limit yang bisa dipakai berulang)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="credit_amount">Jumlah pinjaman</label>
+              <input id="credit_amount" class="money" type="text" inputmode="numeric" autocomplete="off" placeholder="mis. 406.597" aria-describedby="err-credit_amount">
+              <p class="err" id="err-credit_amount"></p>
+            </div>
+            <div class="field">
+              <label for="annuity">Cicilan per periode</label>
+              <input id="annuity" class="money" type="text" inputmode="numeric" autocomplete="off" placeholder="mis. 24.700" aria-describedby="hint-annuity err-annuity">
+              <p class="hint" id="hint-annuity">Besar satu kali cicilan.</p>
+              <p class="err" id="err-annuity"></p>
+            </div>
+            <div class="field wide">
+              <label for="goods_price">Harga barang yang dibeli (opsional)</label>
+              <input id="goods_price" class="money" type="text" inputmode="numeric" autocomplete="off" placeholder="mis. 351.000" aria-describedby="hint-goods">
+              <p class="hint" id="hint-goods">Isi jika pinjaman dipakai untuk membeli barang tertentu.</p>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Penghasilan dan pekerjaan</legend>
+          <div class="fields">
+            <div class="field">
+              <label for="income_total">Penghasilan</label>
+              <input id="income_total" class="money" type="text" inputmode="numeric" autocomplete="off" placeholder="mis. 202.500" aria-describedby="err-income_total">
+              <p class="err" id="err-income_total"></p>
+            </div>
+            <div class="field">
+              <label for="income_type">Jenis pekerjaan</label>
+              <select id="income_type">
+                <option value="Working">Karyawan</option>
+                <option value="Commercial associate">Pegawai usaha atau mitra komersial</option>
+                <option value="State servant">Pegawai negeri</option>
+                <option value="Businessman">Pengusaha</option>
+                <option value="Pensioner">Pensiunan</option>
+                <option value="Student">Pelajar atau mahasiswa</option>
+                <option value="Unemployed">Tidak bekerja</option>
+                <option value="Maternity leave">Cuti melahirkan</option>
+              </select>
+            </div>
+            <div class="field wide">
+              <label for="years_employed">Lama bekerja di pekerjaan sekarang (tahun)</label>
+              <input id="years_employed" type="number" inputmode="decimal" min="0" max="60" step="0.1" placeholder="mis. 3,5" aria-describedby="err-years_employed">
+              <label class="check" for="no_job"><input id="no_job" type="checkbox"> Tidak bekerja atau pensiun</label>
+              <p class="err" id="err-years_employed"></p>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Profil pemohon</legend>
+          <div class="fields">
+            <div class="field">
+              <label for="age_years">Umur (tahun)</label>
+              <input id="age_years" type="number" inputmode="numeric" min="18" max="100" step="1" placeholder="mis. 35" aria-describedby="err-age_years">
+              <p class="err" id="err-age_years"></p>
+            </div>
+            <div class="field">
+              <label for="children">Jumlah anak</label>
+              <input id="children" type="number" inputmode="numeric" min="0" max="20" step="1" value="0" aria-describedby="err-children">
+              <p class="err" id="err-children"></p>
+            </div>
+            <div class="field">
+              <label for="education">Pendidikan terakhir</label>
+              <select id="education">
+                <option value="Secondary / secondary special">SMA atau SMK</option>
+                <option value="Lower secondary">SMP atau lebih rendah</option>
+                <option value="Incomplete higher">Kuliah belum selesai</option>
+                <option value="Higher education">Diploma atau sarjana</option>
+                <option value="Academic degree">Pascasarjana</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="family_status">Status pernikahan</label>
+              <select id="family_status">
+                <option value="Married">Menikah</option>
+                <option value="Single / not married">Belum menikah</option>
+                <option value="Civil marriage">Pernikahan sipil</option>
+                <option value="Separated">Berpisah</option>
+                <option value="Widow">Janda atau duda</option>
+              </select>
+            </div>
+            <div class="field wide">
+              <label for="housing_type">Tempat tinggal</label>
+              <select id="housing_type">
+                <option value="House / apartment">Rumah atau apartemen sendiri</option>
+                <option value="Rented apartment">Sewa</option>
+                <option value="With parents">Tinggal bersama orang tua</option>
+                <option value="Municipal apartment">Rumah susun milik pemerintah</option>
+                <option value="Office apartment">Rumah dinas</option>
+                <option value="Co-op apartment">Apartemen koperasi</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="own_car">Punya mobil</label>
+              <select id="own_car">
+                <option value="N">Tidak</option>
+                <option value="Y">Ya</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="own_realty">Punya rumah atau properti</label>
+              <select id="own_realty">
+                <option value="Y">Ya</option>
+                <option value="N">Tidak</option>
+              </select>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Skor eksternal (opsional)</legend>
+          <p class="hint" style="margin:0 0 16px;max-width:64ch">Tiga skor dari sumber data pihak ketiga, mirip skor biro kredit, bernilai 0 sampai 1. Makin tinggi makin baik. Ketiganya sangat memengaruhi hasil, jadi isi sebanyak yang tersedia atau kosongkan jika tidak ada.</p>
+          <div class="fields" style="grid-template-columns:repeat(3,minmax(0,1fr))" id="ext-fields">
+            <div class="field">
+              <label for="ext_source_1">Skor 1</label>
+              <input id="ext_source_1" type="number" inputmode="decimal" min="0" max="1" step="0.01" placeholder="0,00" aria-describedby="err-ext_source_1">
+              <p class="err" id="err-ext_source_1"></p>
+            </div>
+            <div class="field">
+              <label for="ext_source_2">Skor 2</label>
+              <input id="ext_source_2" type="number" inputmode="decimal" min="0" max="1" step="0.01" placeholder="0,00" aria-describedby="err-ext_source_2">
+              <p class="err" id="err-ext_source_2"></p>
+            </div>
+            <div class="field">
+              <label for="ext_source_3">Skor 3</label>
+              <input id="ext_source_3" type="number" inputmode="decimal" min="0" max="1" step="0.01" placeholder="0,00" aria-describedby="err-ext_source_3">
+              <p class="err" id="err-ext_source_3"></p>
+            </div>
+          </div>
+        </fieldset>
+
+        <div class="actions">
+          <button type="submit" class="btn btn-primary" id="btn-submit">Hitung risiko</button>
+          <button type="button" class="btn btn-secondary" id="btn-clear">Kosongkan isian</button>
+        </div>
+      </form>
+    </section>
+
+    <aside class="panel result-panel" id="result" data-state="empty" aria-live="polite" aria-busy="false">
+      <div class="result-head">
+        <h2>Hasil penilaian</h2>
+        <span class="verdict" id="verdict"></span>
+      </div>
+      <div class="figure"><span class="num" id="num">&ndash;</span><span class="unit" id="unit" hidden>%</span></div>
+      <p class="figure-label">Perkiraan peluang gagal bayar</p>
+      <div class="dots" id="dots" aria-hidden="true"></div>
+      <p class="caption" id="caption">Isi formulir, lalu tekan Hitung risiko. Belum tahu harus mengisi apa? Pakai salah satu contoh di atas formulir.</p>
+
+      <div class="only-done">
+        <p class="compare" id="compare"></p>
+        <dl class="summary" id="summary"></dl>
+        <p class="fine">Perkiraan statistik untuk simulasi, bukan keputusan kredit. Peluang ini belum dikalibrasi.</p>
+      </div>
+    </aside>
+  </div>
+
+  <section class="wrap notes" aria-label="Penjelasan">
+    <div class="notes-grid">
+      <div>
+        <h2>Cara membaca hasil</h2>
+        <p>Angka utama adalah perkiraan peluang pinjaman tidak dilunasi sesuai jadwal. Makin tinggi angkanya, makin besar peluangnya.</p>
+        <p>Sebagai pembanding, sekitar 8% pemohon di data pelatihan gagal bayar. Hasil yang jauh di atas angka itu berarti profil pemohon lebih berisiko dari umumnya.</p>
+        <p>Kategori rendah, sedang, dan tinggi hanya pembagian ilustrasi: di bawah 5%, antara 5% dan 15%, dan di atas 15%. Lembaga keuangan menentukan batasnya sendiri.</p>
+      </div>
+      <div>
+        <h2>Siapa yang memakai alat seperti ini</h2>
+        <p>Analis kredit di bank, perusahaan pembiayaan, dan layanan pinjaman digital. Skor membantu menentukan permohonan mana yang bisa diproses cepat dan mana yang perlu ditinjau lebih teliti.</p>
+        <p>Skor bukan keputusan. Keputusan akhir mengikuti kebijakan perusahaan dan penilaian analis.</p>
+        <p>Halaman ini simulasi untuk portofolio. Aplikasi tidak menyimpan isian Anda, tetapi jangan memasukkan data pribadi yang sebenarnya.</p>
+      </div>
+      <div>
+        <h2>Tentang model dan data</h2>
+        <p>Data berasal dari kompetisi Home Credit Default Risk di Kaggle, memakai tabel permohonan pinjaman utama. Modelnya LightGBM dengan AUC 0,76 pada data validasi. AUC mengukur kemampuan model membedakan pemohon berisiko dari yang aman: 0,5 setara menebak, 1 sempurna.</p>
+        <p>Keterbatasan versi ini:</p>
+        <ul>
+          <li>Data berasal dari pemberi pinjaman internasional, bukan dari Indonesia.</li>
+          <li>Nominal mengikuti data asli, bukan Rupiah.</li>
+          <li>Peluang belum dikalibrasi dan batas keputusan belum ditentukan dari biaya bisnis.</li>
+          <li>Pemeriksaan keadilan antarkelompok belum dilakukan.</li>
+          <li>Tabel riwayat kredit lain belum dipakai.</li>
+        </ul>
+        <p>Tahap pengembangan berikutnya mengerjakan poin-poin ini.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap foot">
+    <p>Proyek portofolio data science.</p>
+    <p><a href="/docs">Dokumentasi API untuk developer</a> &nbsp;&nbsp; <a href="https://github.com/kaixinsho/credit-risk-scoring" target="_blank" rel="noopener">Kode sumber di GitHub</a></p>
+  </div>
+</footer>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (sel) => document.querySelector(sel);
+  const form = $('#form');
+  const panel = $('#result');
+  const numEl = $('#num');
+  const unitEl = $('#unit');
+  const captionEl = $('#caption');
+  const dotsEl = $('#dots');
+  const submitBtn = $('#btn-submit');
+  const noJob = $('#no_job');
+  const yearsEl = $('#years_employed');
+
+  const BASE_RATE = 0.08;
+  const EMPTY_CAPTION = 'Isi formulir, lalu tekan Hitung risiko. Belum tahu harus mengisi apa? Pakai salah satu contoh di atas formulir.';
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const nf = new Intl.NumberFormat('id-ID');
+
+  /* Grid of 100 dots */
+  for (let i = 0; i < 100; i++) {
+    const dot = document.createElement('i');
+    dot.style.setProperty('--i', i);
+    dotsEl.appendChild(dot);
+  }
+  const dots = Array.from(dotsEl.children);
+
+  /* Money inputs: thousands separator while typing, keep caret position */
+  document.querySelectorAll('.money').forEach((el) => {
+    el.addEventListener('input', () => {
+      const caret = el.selectionStart ?? el.value.length;
+      const digitsBefore = el.value.slice(0, caret).replace(/\D/g, '').length;
+      const digits = el.value.replace(/\D/g, '').replace(/^0+(?=\d)/, '').slice(0, 12);
+      el.value = digits ? nf.format(Number(digits)) : '';
+      let seen = 0, pos = 0;
+      while (pos < el.value.length && seen < digitsBefore) {
+        if (/\d/.test(el.value[pos])) seen++;
+        pos++;
+      }
+      try { el.setSelectionRange(pos, pos); } catch (e) { /* ignore */ }
+    });
+  });
+
+  const money = (id) => Number(($('#' + id).value || '').replace(/\D/g, ''));
+
+  const number = (id) => {
+    const el = $('#' + id);
+    if (el.validity && el.validity.badInput) return { empty: false, value: NaN };
+    if (el.value.trim() === '') return { empty: true, value: NaN };
+    return { empty: false, value: el.valueAsNumber };
+  };
+
+  noJob.addEventListener('change', () => {
+    yearsEl.disabled = noJob.checked;
+    if (noJob.checked) { yearsEl.value = ''; setError('years_employed', ''); }
+  });
+
+  /* Errors */
+  function setError(id, message) {
+    const slot = $('#err-' + id);
+    if (!slot) return;
+    slot.textContent = message;
+    const field = slot.closest('.field');
+    if (field) field.classList.toggle('invalid', Boolean(message));
+  }
+
+  function clearErrors() {
+    document.querySelectorAll('.err').forEach((el) => {
+      el.textContent = '';
+      const field = el.closest('.field');
+      if (field) field.classList.remove('invalid');
+    });
+  }
+
+  form.addEventListener('input', (e) => {
+    if (e.target && e.target.id) setError(e.target.id, '');
+  });
+
+  /* Validation and payload */
+  function collect() {
+    const errors = {};
+    const credit = money('credit_amount');
+    const annuity = money('annuity');
+    const income = money('income_total');
+    const goods = money('goods_price');
+
+    if (!(credit > 0)) errors.credit_amount = 'Isi jumlah pinjaman lebih dari 0.';
+    if (!(annuity > 0)) errors.annuity = 'Isi besar cicilan lebih dari 0.';
+    if (!(income > 0)) errors.income_total = 'Isi penghasilan lebih dari 0.';
+
+    const age = number('age_years');
+    if (age.empty || !(age.value >= 18 && age.value <= 100)) errors.age_years = 'Isi umur antara 18 dan 100 tahun.';
+
+    const kids = number('children');
+    if (kids.empty || !Number.isInteger(kids.value) || kids.value < 0 || kids.value > 20) errors.children = 'Isi jumlah anak antara 0 dan 20.';
+
+    let years = null;
+    if (!noJob.checked) {
+      const y = number('years_employed');
+      if (y.empty || !(y.value >= 0 && y.value <= 60)) errors.years_employed = 'Isi lama bekerja, atau centang "Tidak bekerja atau pensiun".';
+      else years = y.value;
+    }
+
+    const ext = {};
+    let filled = 0;
+    ['ext_source_1', 'ext_source_2', 'ext_source_3'].forEach((id) => {
+      const n = number(id);
+      if (n.empty) { ext[id] = null; return; }
+      if (!(n.value >= 0 && n.value <= 1)) { errors[id] = 'Isi nilai antara 0 dan 1, atau kosongkan.'; return; }
+      ext[id] = n.value;
+      filled++;
+    });
+
+    const payload = {
+      contract_type: $('#contract_type').value,
+      credit_amount: credit,
+      annuity: annuity,
+      goods_price: goods > 0 ? goods : null,
+      income_total: income,
+      income_type: $('#income_type').value,
+      years_employed: years,
+      age_years: age.value,
+      children: kids.value,
+      education: $('#education').value,
+      family_status: $('#family_status').value,
+      housing_type: $('#housing_type').value,
+      own_car: $('#own_car').value,
+      own_realty: $('#own_realty').value,
+      ...ext
+    };
+    return { errors, payload, filled };
+  }
+
+  /* Panel states */
+  function resetDots() { dots.forEach((d) => d.classList.remove('on')); }
+
+  function setState(state) {
+    panel.dataset.state = state;
+    panel.setAttribute('aria-busy', state === 'loading' ? 'true' : 'false');
+    captionEl.classList.remove('is-error');
+    if (state !== 'done') {
+      panel.dataset.level = '';
+      resetDots();
+      numEl.textContent = '\u2013';
+      unitEl.hidden = true;
+    }
+  }
+
+  function showEmpty() {
+    setState('empty');
+    captionEl.textContent = EMPTY_CAPTION;
+  }
+
+  function showLoading() {
+    setState('loading');
+    captionEl.textContent = 'Model sedang menghitung. Permintaan pertama bisa memakan waktu sampai setengah menit karena server perlu bangun.';
+  }
+
+  function showError(message) {
+    setState('error');
+    captionEl.textContent = message;
+    captionEl.classList.add('is-error');
+  }
+
+  const level = (p) => (p < 0.05 ? 'low' : p < 0.15 ? 'mid' : 'high');
+  const levelText = { low: 'Risiko rendah', mid: 'Risiko sedang', high: 'Risiko tinggi' };
+
+  function fmtPercent(p) {
+    const v = p * 100;
+    if (v < 0.1) return '< 0,1';
+    return v.toLocaleString('id-ID', { maximumFractionDigits: 1 });
+  }
+
+  const fmtRatio = (x) => x.toLocaleString('id-ID', { maximumFractionDigits: 1 });
+
+  function showResult(p, input) {
+    setState('done');
+    const lvl = level(p);
+    panel.dataset.level = lvl;
+    $('#verdict').textContent = levelText[lvl];
+    numEl.textContent = fmtPercent(p);
+    unitEl.hidden = false;
+
+    const n = Math.min(100, Math.round(p * 100));
+    captionEl.textContent = n === 0
+      ? 'Dari 100 pemohon dengan profil serupa, kurang dari 1 diperkirakan gagal bayar.'
+      : 'Dari 100 pemohon dengan profil serupa, sekitar ' + n + ' diperkirakan gagal bayar.';
+
+    const ratio = p / BASE_RATE;
+    $('#compare').textContent = ratio >= 0.9 && ratio <= 1.1
+      ? 'Rata-rata pemohon di data pelatihan sekitar 8%. Hasil ini hampir sama dengan rata-rata tersebut.'
+      : 'Rata-rata pemohon di data pelatihan sekitar 8%. Hasil ini sekitar ' + fmtRatio(ratio) + ' kali rata-rata tersebut.';
+
+    const rows = [
+      ['Jumlah pinjaman dibanding penghasilan', fmtRatio(input.credit_amount / input.income_total) + ' kali'],
+      ['Perkiraan jumlah cicilan', 'sekitar ' + nf.format(Math.round(input.credit_amount / input.annuity)) + ' kali'],
+      ['Skor eksternal yang diisi', input.filled + ' dari 3']
+    ];
+    const summary = $('#summary');
+    summary.textContent = '';
+    rows.forEach(([term, value]) => {
+      const row = document.createElement('div');
+      const dt = document.createElement('dt');
+      const dd = document.createElement('dd');
+      dt.textContent = term;
+      dd.textContent = value;
+      row.append(dt, dd);
+      summary.appendChild(row);
+    });
+    if (input.filled < 3) {
+      const note = document.createElement('p');
+      note.className = 'fine';
+      note.style.marginTop = '12px';
+      note.textContent = 'Hasil lebih tajam jika ketiga skor eksternal diisi.';
+      summary.after(note);
+      note.dataset.temp = '1';
+    }
+
+    resetDots();
+    const fill = () => dots.slice(0, n).forEach((d) => d.classList.add('on'));
+    if (reduceMotion) fill(); else window.setTimeout(fill, 40);
+  }
+
+  function removeTempNotes() {
+    document.querySelectorAll('[data-temp="1"]').forEach((el) => el.remove());
+  }
+
+  /* Submit */
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    clearErrors();
+    removeTempNotes();
+
+    const { errors, payload, filled } = collect();
+    const ids = Object.keys(errors);
+    if (ids.length) {
+      ids.forEach((id) => setError(id, errors[id]));
+      const first = $('#' + ids[0]);
+      if (first) first.focus();
+      return;
+    }
+
+    showLoading();
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Menghitung';
+    if (window.innerWidth <= 960) {
+      panel.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 45000);
+    try {
+      const res = await fetch('/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+      if (res.status === 422) {
+        showError('Server menolak sebagian isian. Periksa kembali angka yang dimasukkan, lalu tekan Hitung risiko lagi.');
+        return;
+      }
+      if (!res.ok) {
+        showError('Server belum bisa memproses permintaan (kode ' + res.status + '). Tunggu beberapa detik, lalu tekan Hitung risiko lagi.');
+        return;
+      }
+      const data = await res.json();
+      if (typeof data.default_probability !== 'number') throw new Error('format');
+      showResult(data.default_probability, { ...payload, filled });
+    } catch (err) {
+      const timedOut = err && err.name === 'AbortError';
+      showError(timedOut
+        ? 'Server terlalu lama menjawab. Tekan Hitung risiko lagi; percobaan kedua biasanya lebih cepat.'
+        : 'Tidak bisa terhubung ke server. Periksa koneksi internet, lalu tekan Hitung risiko lagi.');
+    } finally {
+      window.clearTimeout(timer);
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Hitung risiko';
+    }
+  });
+
+  /* Examples and reset */
+  const PRESETS = {
+    a: {
+      contract_type: 'Cash loans', credit_amount: 406597, annuity: 24700, goods_price: 351000,
+      income_total: 202500, income_type: 'Working', years_employed: 1.7,
+      age_years: 26, children: 0, education: 'Secondary / secondary special',
+      family_status: 'Single / not married', housing_type: 'House / apartment',
+      own_car: 'N', own_realty: 'Y',
+      ext_source_1: 0.08, ext_source_2: 0.26, ext_source_3: 0.14
+    },
+    b: {
+      contract_type: 'Cash loans', credit_amount: 270000, annuity: 13500, goods_price: 270000,
+      income_total: 450000, income_type: 'State servant', years_employed: 14,
+      age_years: 45, children: 2, education: 'Higher education',
+      family_status: 'Married', housing_type: 'House / apartment',
+      own_car: 'Y', own_realty: 'Y',
+      ext_source_1: 0.65, ext_source_2: 0.72, ext_source_3: 0.70
+    }
+  };
+
+  function applyPreset(key) {
+    const p = PRESETS[key];
+    clearErrors();
+    removeTempNotes();
+    Object.entries(p).forEach(([id, value]) => {
+      const el = $('#' + id);
+      if (!el) return;
+      el.value = el.classList.contains('money') ? nf.format(value) : String(value);
+    });
+    noJob.checked = false;
+    yearsEl.disabled = false;
+    showEmpty();
+  }
+
+  document.querySelectorAll('[data-preset]').forEach((btn) => {
+    btn.addEventListener('click', () => applyPreset(btn.dataset.preset));
+  });
+
+  $('#btn-clear').addEventListener('click', () => {
+    form.reset();
+    yearsEl.disabled = false;
+    clearErrors();
+    removeTempNotes();
+    showEmpty();
+  });
+
+  showEmpty();
+})();
+</script>
+</body>
+</html>

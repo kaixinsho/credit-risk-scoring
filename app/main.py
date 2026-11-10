@@ -2,21 +2,21 @@ import ctypes
 import sys
 from pathlib import Path
 
-# Server Vercel tidak punya libgomp (dibutuhkan LightGBM), jadi kita muat salinan sendiri dulu
+ROOT = Path(__file__).resolve().parent.parent
+
+# Server Vercel tidak punya libgomp (dibutuhkan LightGBM), jadi muat salinan sendiri dulu
 if sys.platform.startswith("linux"):
-    _gomp = Path(__file__).resolve().parent.parent / "lib" / "libgomp.so.1"
+    _gomp = ROOT / "lib" / "libgomp.so.1"
     if _gomp.exists():
         ctypes.CDLL(str(_gomp), mode=ctypes.RTLD_GLOBAL)
 
-from pathlib import Path
+import joblib  # noqa: E402
+import numpy as np  # noqa: E402
+import pandas as pd  # noqa: E402
+from fastapi import FastAPI  # noqa: E402
+from fastapi.responses import HTMLResponse  # noqa: E402
+from pydantic import BaseModel, Field  # noqa: E402
 
-import joblib
-import numpy as np
-import pandas as pd
-from fastapi import FastAPI
-from pydantic import BaseModel
-
-ROOT = Path(__file__).resolve().parent.parent
 bundle = joblib.load(ROOT / "models" / "lgbm_v1.joblib")
 model = bundle["model"]
 categories = bundle["categories"]
@@ -30,20 +30,20 @@ class Applicant(BaseModel):
     gender: str = "F"
     own_car: str = "N"
     own_realty: str = "Y"
-    children: int = 0
-    income_total: float
-    credit_amount: float
-    annuity: float
+    children: int = Field(default=0, ge=0, le=20)
+    income_total: float = Field(gt=0)
+    credit_amount: float = Field(gt=0)
+    annuity: float = Field(gt=0)
     goods_price: float | None = None
-    age_years: float
+    age_years: float = Field(ge=18, le=100)
     years_employed: float | None = None  # kosongkan jika tidak bekerja / pensiun
     income_type: str = "Working"
     education: str = "Secondary / secondary special"
     family_status: str = "Married"
     housing_type: str = "House / apartment"
-    ext_source_1: float | None = None
-    ext_source_2: float | None = None
-    ext_source_3: float | None = None
+    ext_source_1: float | None = Field(default=None, ge=0, le=1)
+    ext_source_2: float | None = Field(default=None, ge=0, le=1)
+    ext_source_3: float | None = Field(default=None, ge=0, le=1)
 
 
 def nan(x):
@@ -80,7 +80,18 @@ def to_frame(a: Applicant) -> pd.DataFrame:
     return df
 
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+def home():
+    page = ROOT / "web" / "index.html"
+    if not page.exists():
+        return HTMLResponse(
+            "<p>Halaman web belum tersedia. Dokumentasi API ada di <a href='/docs'>/docs</a>.</p>",
+            status_code=404,
+        )
+    return HTMLResponse(page.read_text(encoding="utf-8"))
+
+
+@app.get("/health")
 def health():
     return {"status": "ok", "model_auc": round(bundle["auc"], 4)}
 
